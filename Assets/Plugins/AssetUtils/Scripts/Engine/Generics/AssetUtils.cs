@@ -26,10 +26,10 @@ namespace Arcturus.AssetUtil
         /// </summary>
         /// <param name="folderOrigin"></param>
         /// <param name="pathFromOrigin"></param>
-        /// <param name="spritePivotX"></param>
-        /// <param name="spritePivotY"></param>
+        /// <param name="streamedSpritePivotX"></param>
+        /// <param name="streamedSpritePivotY"></param>
         /// <returns></returns>
-        public static Sprite GetAssetSprite(FolderOrigin folderOrigin, string pathFromOrigin, float spritePivotX = 0.5f, float spritePivotY = 0.5f)
+        public static Sprite GetAssetSprite(FolderOrigin folderOrigin, string pathFromOrigin, float streamedSpritePivotX = 0.5f, float streamedSpritePivotY = 0.5f)
         {
             switch (folderOrigin)
             {
@@ -41,7 +41,7 @@ namespace Arcturus.AssetUtil
                     var bytes = File.ReadAllBytes(path);
                     Texture2D texture = GetBlankTexture();
                     texture.LoadImage(bytes);
-                    return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(spritePivotX, spritePivotY));
+                    return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(streamedSpritePivotX, streamedSpritePivotY));
 
                 default:
                     return null;
@@ -71,6 +71,31 @@ namespace Arcturus.AssetUtil
 
                 default:
                     return "";
+            }
+        }
+
+        /// <summary>
+        /// Locates and returns bytes from an asset if it exists at the given path.<br/>
+        /// Handles both the Resources and StreamingAssets folders.<br/><br/>
+        /// Note:<br/>
+        /// - Resources do not include file extension.<br/>
+        /// - StreamingAssets do include file extension.<br/>
+        /// </summary>
+        /// <param name="pathFromOrigin"></param>
+        /// <returns></returns>
+        public static byte[] GetAssetBytes(FolderOrigin folderOrigin, string pathFromOrigin)
+        {
+            switch (folderOrigin)
+            {
+                case FolderOrigin.Resources:
+                    return Resources.Load<TextAsset>(pathFromOrigin).bytes;
+
+                case FolderOrigin.StreamingAssets:
+                    var path = Path.Combine(Application.streamingAssetsPath, pathFromOrigin);
+                    return File.ReadAllBytes(path);
+
+                default:
+                    return new byte[0];
             }
         }
 
@@ -131,6 +156,32 @@ namespace Arcturus.AssetUtil
                 var bytes = www.downloadHandler.data;
                 var text = Convert.ToBase64String(bytes);
                 OnTextIsLoaded?.Invoke(text);
+            }
+        }
+
+        /// <summary>
+        /// This reads the StreamingAssets directory through local host madness.<br/>
+        /// Requires a provided function for handling the output byte array.<br/><br/>
+        /// Important:<br/>
+        /// - Only use for android and webgl builds.<br/>
+        /// - Include file extension in path.
+        /// </summary>
+        /// <param name="pathFromStreamingAssets"></param>
+        /// <param name="OnBytesIsLoaded"></param>
+        /// <returns></returns>
+        public static IEnumerator GetAssetBytesAndroid(string pathFromStreamingAssets, Action<byte[]> OnBytesIsLoaded)
+        {
+            var path = Path.Combine(Application.streamingAssetsPath, pathFromStreamingAssets);
+
+            var www = UnityWebRequest.Get(path);
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
+                Debug.LogError(www.error);
+            else
+            {
+                var bytes = www.downloadHandler.data;
+                OnBytesIsLoaded?.Invoke(bytes);
             }
         }
         #endregion
